@@ -14,6 +14,8 @@
 # limitations under the License.
 # ===============================================================================
 import time
+from PIL import Image
+import cv2
 
 from camera import ToupCamCamera
 
@@ -22,6 +24,10 @@ def main():
 
     cam = ToupCamCamera()
     cam.open()
+    size = cam.get_size()
+    esize = cam.get_esize()
+    size = cam.get_size()
+    resolution = cam.resolution
 
     # wait for camera to startup
     time.sleep(2)
@@ -31,9 +37,11 @@ def main():
     # every t seconds
     t = 2
 
-    for i in xrange(n):
+    for i in range(n):
         path = 'test_image-{:02d}.jpg'.format(i)
-        cam.save(path)
+        img = cam.get_cv_image()
+        cv2.imwrite(path, img)
+        # cam.save(path)
         time.sleep(t)
 
 

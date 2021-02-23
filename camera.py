@@ -20,8 +20,9 @@ import ctypes
 import os
 
 from PIL import Image
+import cv2
 from numpy import zeros, uint8, uint32
-from cStringIO import StringIO
+from io import StringIO
 # ============= local library imports  ==========================
 from core import lib, TOUPCAM_EVENT_IMAGE, TOUPCAM_EVENT_STILLIMAGE, success, HToupCam
 
@@ -34,11 +35,15 @@ class ToupCamCamera(object):
 
     resolution = None
     size = None
+    frame_rate = None
+    max_frame_rate = None
 
     def __init__(self, resolution=None, bits=32, size=None):
+
         if resolution is None and size is None:
             resolution = 2
 
+        # int bits: 24, 32 or 8, means RGB24, RGB32 or 8 bits grey images. This parameter is ignored in RAW mode.
         if bits not in (32,):
             raise ValueError('Bits needs to by 8 or 32')
 
@@ -74,7 +79,17 @@ class ToupCamCamera(object):
 
         return s.getvalue()
 
-    def get_pil_image(self, data=None):
+    def get_cv_image(self, data=None):
+        # im = self._data
+        if data is None:
+            data = self._data
+
+        raw = data.view(uint8).reshape(data.shape + (-1,))
+        bgr = raw[..., :3]
+        print(f"BGR shape:{bgr.shape}")
+        return bgr
+
+    def get_pilimage(self, data=None):
         # im = self._data
         if data is None:
             data = self._data
@@ -111,6 +126,7 @@ class ToupCamCamera(object):
         else:
             dtype = uint32
 
+        # Users have to make sure that the data buffer capacity is enough to save the image data.
         self._data = zeros(shape, dtype=dtype)
 
         bits = ctypes.c_int(self.bits)
@@ -119,9 +135,17 @@ class ToupCamCamera(object):
             if nEvent == TOUPCAM_EVENT_IMAGE:
                 w, h = ctypes.c_uint(), ctypes.c_uint()
 
+                '''
+                :param HToupCam: handle to cam
+                :param pImageData: (void*) Data buffer. 
+                :param bits: (int) 24, 32 or 8, means RGB24, RGB32 or 8 bits grey images. This parameter is ignored in RAW mode.
+                :param pnWidth: (unsigned*) width of image.
+                :param pnWidth: (unsigned*) height of image.
+                '''
                 lib.Toupcam_PullImage(self.cam, ctypes.c_void_p(self._data.ctypes.data), bits,
                                       ctypes.byref(w),
                                       ctypes.byref(h))
+                print(f"TOUPCAM_IMAGE_EVENT- width:{w.value}, height:{h.value}; data-length:{len(self._data)}; data-shape:{self._data.shape}; bitdepth:{bits.value}; dtype:{dtype}")
 
             elif nEvent == TOUPCAM_EVENT_STILLIMAGE:
                 w, h = self.get_size()
